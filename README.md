@@ -8,8 +8,8 @@ The eventual goal is for this agent to be to automatically apply to matched jobs
 ## Usage
 1. Clone or download the repo
 2. Create a config.py file either by renaming example.config.py file or creating a new one yourself. Make sure all the fields are filled out appropriately including the AI model fields, which determine which LLM will be used (I've personally been using Llama 3.1 8B locally with LM studio but any OpenAI compatible model should work). Also make sure that the browser you want to use (config.search['browser']) is installed on your system.
-3a. Optionally create and activate a virtual environment (recommended, I personally use venv in a .venv folder in the same directory)
-3b. Run pip install -r requirements.txt
-4. Run agent.py
-5. Login to LinkedIn/complete FFA
-6. Don't interfere with the agent while it's running. The agent's browser needs to remain open, closing the browser will result in an error. The browser can be minimized, in the background or on a secondary monitor though.
+3. Optionally create and activate a virtual environment (recommended, I personally use venv in a .venv folder in the same directory)
+4. Run pip install -r requirements.txt
+5. Run agent.py
+6. Login to LinkedIn/complete FFA
+7. Don't interfere with the agent while it's running. The agent's browser needs to remain open, closing the browser will result in an error. The browser can be minimized, in the background or on a secondary monitor though.
