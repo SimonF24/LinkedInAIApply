@@ -194,7 +194,7 @@ class Agent:
                         # If the user wants to skip previously viewed jobs and this job is marked as viewed, skip it
                         try:
                             if (self.config.search['skip_previously_viewed']
-                                and 'Viewed' in job_element.find_element(By.CLASS_NAME, "job-card-list__footer-wrapper").text):
+                                and 'Viewed' in job_element.find_element(By.CLASS_NAME, "job-card-container__footer-wrapper").text):
                                 continue
                         except NoSuchElementException:
                             pass
