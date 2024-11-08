@@ -12,4 +12,5 @@ The eventual goal is for this agent to be to automatically apply to matched jobs
 4. Run pip install -r requirements.txt
 5. Run agent.py
 6. Login to LinkedIn/complete FFA
-7. Don't interfere with the agent while it's running. The agent's browser needs to remain open, closing the browser will result in an error. The browser can be minimized, in the background or on a secondary monitor though.
+7. Don't interfere with the agent while it's running the job search. The agent's browser needs to remain open, closing the browser will result in an error. The browser can be minimized, in the background or on a secondary monitor though. Your computer going to sleep will result in the script throwing an error so set your settings accoringly if you want to run the script for an extended period of time.
+8. If manually applying for jobs simply apply for the job that pops up in a second tab of the browser. Once finished close the tab that popped up and another job will open. You can open and close other tabs as you like but leave one tab open at all times so the browser doesn't close. A new job will open when you close the tab that opened with the last job. If the browser closes you are assumed to be done applying for jobs for now. The jobs you applied for will be saved but you'll have to re-run the script to apply for more.

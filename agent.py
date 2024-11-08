@@ -79,46 +79,34 @@ class Agent:
         )
     
     def __del__(self):
-        self.save_matched_jobs()
-        self.driver.close()
-        
-    # def apply_to_easy_apply_job(self, job_url: str):
-    #     self.driver.get(job_url)
-    #     try:
-    #         apply_button_element = self.driver.find_element(By.CLASS_NAME, "jobs-apply-button")
-    #         apply_button_element.click()
-    #         while True:
-    #             easy_apply_form = self.driver.find_element(By.CLASS_NAME, "jobs-easy-apply-content").find_element(By.TAG_NAME, "form")
-    #             easy_apply_form_html = easy_apply_form.get_attribute('innerHTML')
-    #             prompt = self.create_application_prompt(easy_apply_form_html)
-    #             ai_response = self.get_ai_response(prompt)
-    #             if re.compile(r'\b[Dd]one\b').search(ai_response):
-    #                 break
-    #             exec(ai_response) # Executing AI generated code, very dangerous, super bad idea, etc.
-    #     except NoSuchElementException:
-    #         return
-    #     except:
-    #         pass
+        self.driver.quit()
     
-    # def apply_to_job(self, job_url: str):
-    #     self.driver.get(job_url)
-    #     try:
-    #         while True:
-    #             page_body_html = self.driver.find_element(By.TAG_NAME, 'body')
-    #             prompt = self.create_application_prompt(page_body_html)
-    #             ai_response = self.get_ai_response(prompt)
-    #             if re.compile(r'\b[Dd]one\b').search(ai_response):
-    #                 break
-    #             exec(ai_response) # Executing AI generated code, very dangerous, super bad idea, etc.
-    #     except:
-    #         pass
-    
-    # def apply_to_jobs(self):
-    #     for job in self.matched_jobs:
-    #         if 'linkedin.com' in job:
-    #             self.apply_to_easy_apply_job(job)
-    #         else:
-    #             self.apply_to_job(job)
+    def manually_apply_to_jobs(self):
+        """
+        Iterates through the list of matched jobs and takes the user to the page for them to apply themselves.
+        Goes to the the next job when the tab with the open job is closed by the user. Ends if the user closes the
+        selenium browser
+        """
+        i = 0
+        original_window = self.driver.current_window_handle
+        for job in self.matched_jobs:
+            self.driver.switch_to.new_window('tab')
+            self.driver.get(job)
+            job_window = self.driver.current_window_handle
+            user_closed = False
+            while job_window in self.driver.window_handles:
+                time.sleep(1)
+                try:
+                    self.driver.window_handles
+                except:
+                    user_closed = True
+                    break
+            if user_closed:
+                break
+            self.applied_jobs.append(job)
+            self.driver.switch_to.window(original_window) 
+            i += 1
+        self.matched_jobs = self.matched_jobs[i:]
     
     def login_to_linkedin(self):
         """
@@ -156,11 +144,14 @@ class Agent:
         Searches for jobs on LinkedIn from the given search terms and locations
         then adds them to the jobs list
         """
-        search_start_time = time.time()
+        applied_job_set = set(self.applied_jobs)
+        matched_job_set = set(self.matched_jobs)
         for search_term in self.config.search['search_terms']:
+            search_term_start_time = time.time()
             for search_location in self.config.search['locations']:
                 base_url = "https://www.linkedin.com/jobs/search/"
                 page_num = 1
+                broken = False
                 while True: # We go until there's no next page and save the matched jobs after every page
                     try:
                         self.driver.get(f"{base_url}?keywords={search_term.replace(" ", "%20")}"
@@ -192,11 +183,22 @@ class Agent:
                     except NoSuchElementException:
                         break
                     for job_element in job_elements:
-                        try: # If the job element is an inline suggestion ignore it and continue on to the next element
+                        
+                        # If the job element is an inline suggestion ignore it and continue on to the next element
+                        try:
                             job_element.find_element(By.CLASS_NAME, 'jobs-search-inline-suggestions-card')
                             continue
                         except NoSuchElementException:
                             pass
+                        
+                        # If the user wants to skip previously viewed jobs and this job is marked as viewed, skip it
+                        try:
+                            if (self.config.search['skip_previously_viewed']
+                                and 'Viewed' in job_element.find_element(By.CLASS_NAME, "job-card-list__footer-wrapper").text):
+                                continue
+                        except NoSuchElementException:
+                            pass
+                        
                         # Parse the job and ask the model if it's a good match
                         self.actions.move_to_element(job_element).perform()
                         job_element.click()
@@ -254,7 +256,7 @@ class Agent:
                             original_window = self.driver.current_window_handle
                             apply_button_element.click()
                             # Get the url from clicking on the button and going to the new tab it opens
-                            wait = WebDriverWait(self.driver, 10)
+                            wait = WebDriverWait(self.driver, 60)
                             try:
                                 wait.until(EC.number_of_windows_to_be(2))
                             except TimeoutException:
@@ -268,14 +270,21 @@ class Agent:
                                 # Close to window and switch back to the original window
                                 self.driver.close()
                                 self.driver.switch_to.window(original_window) 
-                        self.matched_jobs.append(job_url)
+                        if job_url not in applied_job_set and job_url not in matched_job_set:
+                            self.matched_jobs.append(job_url)
+                            matched_job_set.add(job_url)
                     
-                    if time.time() - search_start_time > self.config.search['max_search_time']:
-                        return
+                        if time.time() - search_term_start_time > self.config.search['max_search_time'] / len(self.config.search['search_terms']):
+                            broken = True
+                            break
+                        
+                    if broken:
+                        break
 
-                    if page_num % self.config.search['save_matched_jobs_every_x_pages'] == 0:
+                    if page_num % self.config.search['save_results_every_x_pages'] == 0:
                         self.save_matched_jobs()
                     page_num += 1
+        self.save_matched_jobs()
 
     def get_ai_response(self, prompt: str) -> str:
         """
@@ -308,24 +317,6 @@ class Agent:
         )
         response_dict = {"role": "assistant", "content": completion.choices[0].message.content}
         return messages + [response_dict]
-    
-    # def create_application_prompt(self, page_html: str):
-    #     """
-    #     Creates a prompt to have the LLM try to apply for the job
-    #     """
-    #     return (
-    #         f"Here is selenium documentation on locating elements on a page:\n{selenium_driver_location_documentation}\n"
-    #         f"Here is selenium documentation on navigation:\n{selenium_driver_navigation_documentation}\n"
-    #         f"Here is the selenium documentation on waiting:\n{selenium_driver_wait_documentation}\n"
-    #         f"Here is the user's profile:\n{self.user_profile_text}\n"
-    #         f"Here is the html of a job application web page:\n{page_html}\n"
-    #         "Please return selenium Python code to fill out any forms on the page and advance "
-    #         "to the next page or submit the job application. Your output will be directly executed in a Python environment "
-    #         "so please output only valid Python code. In this environment \"from selenium.webdriver.common.by import By\" "
-    #         "has already been executed so you don't need to repeat it and the selenium webdriver can be accessed as "
-    #         "\"self.driver\". Also note that you are already signed in to linkedin. If the job has been submitted please "
-    #         "say \"done\". If the job hasn't been submitted please avoid using the word \"done\". The best thing to do may involve waiting."
-    #     )
         
     def create_job_match_questionaire_prompt(self, company: str, description: str, location: str, title: str) -> str:
         """
@@ -385,11 +376,11 @@ class Agent:
         with open(self.config.search['applied_jobs_json_filename'], 'w') as file:
             json.dump(self.applied_jobs, file)
         
-    def save_matched_jobs(self):
+    def save_matched_jobs(self, overwrite=False):
         """
         Saves matched jobs to a file (config.search['matched_jobs_json_filename'])
         """
-        if Path(self.config.search['matched_jobs_json_filename']).is_file():
+        if Path(self.config.search['matched_jobs_json_filename']).is_file() and not overwrite:
             applied_job_set = set(self.applied_jobs)
             with open(self.config.search['matched_jobs_json_filename'], 'r') as file:
                 previous_jobs = json.load(file)
@@ -413,4 +404,6 @@ if __name__ == "__main__":
     agent.search_for_jobs()
     agent.save_applied_jobs()
     agent.save_matched_jobs()
-    #agent.apply_to_jobs()
+    agent.manually_apply_to_jobs()
+    agent.save_applied_jobs()
+    agent.save_matched_jobs(overwrite=True)
