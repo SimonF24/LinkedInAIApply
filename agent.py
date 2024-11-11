@@ -150,8 +150,8 @@ class Agent:
             search_term_start_time = time.time()
             for search_location in self.config.search['locations']:
                 base_url = "https://www.linkedin.com/jobs/search/"
-                page_num = 1
-                broken = False
+                page_num = 0
+                breakout = False
                 while True: # We go until there's no next page and save the matched jobs after every page
                     try:
                         self.driver.get(f"{base_url}?keywords={search_term.replace(" ", "%20")}"
@@ -256,11 +256,18 @@ class Agent:
                             original_window = self.driver.current_window_handle
                             apply_button_element.click()
                             # Get the url from clicking on the button and going to the new tab it opens
-                            wait = WebDriverWait(self.driver, 60)
+                            wait = WebDriverWait(self.driver, 30)
                             try:
                                 wait.until(EC.number_of_windows_to_be(2))
                             except TimeoutException:
-                                pass
+                                try: # Close the modal
+                                    modal_element = self.driver.find_element(By.CLASS_NAME, 'artdeco-modal')
+                                    modal_element.find_element(By.CLASS_NAME, 'artdeco-button--circle').click()
+                                    apply_button_element = selected_job_element.find_element(
+                                        By.CLASS_NAME, "jobs-apply-button")
+                                    apply_button_element.click()
+                                except NoSuchElementException:
+                                    pass
                             for window_handle in self.driver.window_handles:
                                 if window_handle != original_window:
                                     self.driver.switch_to.window(window_handle)
@@ -269,16 +276,18 @@ class Agent:
                                 job_url = self.driver.current_url
                                 # Close to window and switch back to the original window
                                 self.driver.close()
-                                self.driver.switch_to.window(original_window) 
+                                self.driver.switch_to.window(original_window)
+                            else:
+                                continue
                         if job_url not in applied_job_set and job_url not in matched_job_set:
                             self.matched_jobs.append(job_url)
                             matched_job_set.add(job_url)
                     
                         if time.time() - search_term_start_time > self.config.search['max_search_time'] / len(self.config.search['search_terms']):
-                            broken = True
+                            breakout = True
                             break
                         
-                    if broken:
+                    if breakout:
                         break
 
                     if page_num % self.config.search['save_results_every_x_pages'] == 0:
@@ -401,9 +410,13 @@ if __name__ == "__main__":
     agent.load_applied_jobs()
     agent.load_matched_jobs()
     agent.login_to_linkedin()
+    print('Searching for jobs')
     agent.search_for_jobs()
     agent.save_applied_jobs()
     agent.save_matched_jobs()
+    print('Finished searching for jobs!')
+    print('Starting manual job applications')
     agent.manually_apply_to_jobs()
     agent.save_applied_jobs()
     agent.save_matched_jobs(overwrite=True)
+    print('Done!')
