@@ -15,10 +15,12 @@ search = dict(
     locations = [ # Locations where you want to find a job
         "San Francisco Bay Area"
     ],
+    manually_apply_for_jobs = True, # Whether or not to run the manual application portion of the script
     matched_jobs_json_filename = "matched_jobs.json", # Filename for a JSON file containing jobs you've been matched with
     max_search_time = 60*60, # Maximum search time in seconds, the search will finish the page it's on when this time runs out
     remote_ok = True, # Whether you're ok with remote work
     save_results_every_x_pages = 1, # After how many pages (25 jobs) to save the search results to our file
+    search_for_jobs = True, # Whether or not to run the search portion of the script
     search_terms = [ # Searches you want the agent to make
         "machine learning",
         "artificial intelligence"
