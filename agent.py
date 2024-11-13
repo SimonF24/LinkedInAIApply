@@ -12,7 +12,7 @@ from pypdf import PdfReader
 import re
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -92,7 +92,12 @@ class Agent:
         for job in self.matched_jobs:
             self.driver.switch_to.new_window('tab')
             self.driver.get(job)
-            job_window = self.driver.current_window_handle
+            try:
+                job_window = self.driver.current_window_handle
+            except NoSuchWindowException:
+                self.driver.switch_to.window(original_window)
+                i += 1
+                continue
             user_closed = False
             while job_window in self.driver.window_handles:
                 time.sleep(1)
@@ -260,12 +265,16 @@ class Agent:
                             try:
                                 wait.until(EC.number_of_windows_to_be(2))
                             except TimeoutException:
-                                try: # Close the modal
+                                try: # Try to close the modal in case that's what preventing the new window from opening
                                     modal_element = self.driver.find_element(By.CLASS_NAME, 'artdeco-modal')
                                     modal_element.find_element(By.CLASS_NAME, 'artdeco-button--circle').click()
                                     apply_button_element = selected_job_element.find_element(
                                         By.CLASS_NAME, "jobs-apply-button")
                                     apply_button_element.click()
+                                    try:
+                                        wait = WebDriverWait(self.driver, 30)
+                                    except TimeoutException:
+                                        continue
                                 except NoSuchElementException:
                                     pass
                             for window_handle in self.driver.window_handles:
@@ -409,12 +418,12 @@ if __name__ == "__main__":
     agent = Agent(config=config)
     agent.load_applied_jobs()
     agent.load_matched_jobs()
-    agent.login_to_linkedin()
-    print('Searching for jobs')
-    agent.search_for_jobs()
-    agent.save_applied_jobs()
-    agent.save_matched_jobs()
-    print('Finished searching for jobs!')
+    # agent.login_to_linkedin()
+    # print('Searching for jobs')
+    # agent.search_for_jobs()
+    # agent.save_applied_jobs()
+    # agent.save_matched_jobs()
+    # print('Finished searching for jobs!')
     print('Starting manual job applications')
     agent.manually_apply_to_jobs()
     agent.save_applied_jobs()
