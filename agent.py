@@ -12,7 +12,10 @@ from pypdf import PdfReader
 import re
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, TimeoutException
+from selenium.common.exceptions import (
+    NoSuchElementException, NoSuchWindowException,
+    StaleElementReferenceException, TimeoutException
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -131,6 +134,12 @@ class Agent:
             except NoSuchElementException:
                 raise Exception('Failed to find the password element')
             password_element.send_keys(self.config.user['linkedin_password'])
+            try:
+                rememberMeCheckbox = self.driver.find_element(By.ID, 'rememberMeOptIn-checkbox')
+                self.driver.execute_script("arguments[0].click()", rememberMeCheckbox)
+                # Have to use JavaScript click above because the form element intercepts the Selenium click
+            except NoSuchElementException:
+                pass
             button_elements = self.driver.find_elements(By.TAG_NAME, 'button')
             success = False
             for button_element in button_elements:
@@ -215,6 +224,8 @@ class Agent:
                             company_name = selected_job_element.find_element(
                                 By.CLASS_NAME, "job-details-jobs-unified-top-card__company-name").text
                         except NoSuchElementException:
+                            continue
+                        except StaleElementReferenceException:
                             continue
                         try:
                             description_text = selected_job_element.find_element(
@@ -408,7 +419,7 @@ class Agent:
             for job in self.matched_jobs:
                 if job not in previous_job_set and job not in applied_job_set:
                     new_jobs.append(job)
-            with open(self.config.search['matched_jobs_json_filename'], 'w') as file: # There's maybe a way to append here
+            with open(self.config.search['matched_jobs_json_filename'], 'w') as file:
                 json.dump(previous_jobs + new_jobs, file)
         else:
             with open(self.config.search['matched_jobs_json_filename'], 'w') as file:
