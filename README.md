@@ -1,4 +1,4 @@
-# LinkedInAIApply
+# LinkedInAISearch
 A really simple AI agent to search LinkedIn for jobs that match your experience level, interests, and preferences.
 
 The agent searches LinkedIn for matching jobs then saves them to a JSON file (config.search['matched_jobs_json_filename']) as a list of URL strings for you to do what you please with. You could run this script overnight, watch the JSON file for changes and email yourself a message with new matched jobs, manually apply to them, or do anything else you want with the information.
